@@ -144,20 +144,23 @@ if(WIN32)
 else()
     target_compile_options(AGPRender PRIVATE -fvisibility=hidden)
 endif()
-set(shader_compiler_executable "${CMAKE_BINARY_DIR}/LumeShaderCompiler.exe")
-set(argument_list)
-list(APPEND argument_list "--optimize")
-list(APPEND argument_list "--source")
-list(APPEND argument_list ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/shaders)
-list(APPEND argument_list "--include")
-list(APPEND argument_list ${CMAKE_CURRENT_SOURCE_DIR}/api)
-list(APPEND argument_list "--vulkan")
-list(APPEND argument_list "1.1")
-list(APPEND argument_list "--check-if-changed")
-add_custom_target(RenderCompileShaders ALL
-  COMMAND ${shader_compiler_executable} ${argument_list}
-  COMMAND_EXPAND_LISTS)
-add_dependencies(AGPRender RenderCompileShaders)
+# Shader compilation (Windows only for now)
+if(WIN32)
+    set(shader_compiler_executable "${CMAKE_BINARY_DIR}/LumeShaderCompiler.exe")
+    set(argument_list)
+    list(APPEND argument_list "--optimize")
+    list(APPEND argument_list "--source")
+    list(APPEND argument_list ${CMAKE_CURRENT_SOURCE_DIR}/assets/render/shaders)
+    list(APPEND argument_list "--include")
+    list(APPEND argument_list ${CMAKE_CURRENT_SOURCE_DIR}/api)
+    list(APPEND argument_list "--vulkan")
+    list(APPEND argument_list "1.1")
+    list(APPEND argument_list "--check-if-changed")
+    add_custom_target(RenderCompileShaders ALL
+        COMMAND ${shader_compiler_executable} ${argument_list}
+        COMMAND_EXPAND_LISTS)
+    add_dependencies(AGPRender RenderCompileShaders)
+endif()
 
 #
 # Target: PluginAGPRender
