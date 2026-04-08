@@ -17,10 +17,21 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/LumeShaderCompiler.exe")
 endif()
 
 #
-# Target: Vulkan. Install VulkanSDK from https://vulkan.lunarg.com/sdk/home#windows.
+# Target: Vulkan. Install VulkanSDK from https://vulkan.lunarg.com/sdk/home
 #
 find_package(Vulkan REQUIRED)
-set_target_properties(Vulkan::Vulkan PROPERTIES INTERFACE_COMPILE_DEFINITIONS VK_USE_PLATFORM_WIN32_KHR=1)
+
+# Platform-specific Vulkan settings
+if(APPLE)
+    set_target_properties(Vulkan::Vulkan PROPERTIES INTERFACE_COMPILE_DEFINITIONS 
+        VK_USE_PLATFORM_METAL_EXT=1)
+elseif(WIN32)
+    set_target_properties(Vulkan::Vulkan PROPERTIES INTERFACE_COMPILE_DEFINITIONS 
+        VK_USE_PLATFORM_WIN32_KHR=1)
+elseif(UNIX AND NOT APPLE)
+    set_target_properties(Vulkan::Vulkan PROPERTIES INTERFACE_COMPILE_DEFINITIONS 
+        VK_USE_PLATFORM_XLIB_KHR=1)
+endif()
 
 #
 # Target: AGPBaseAPI
@@ -61,6 +72,16 @@ list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/gles/.*")
 list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/device/ohos/.*")
 list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/vulkan/ohos/.*")
 list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/plugin/.*")
+
+# Platform-specific source filtering
+if(APPLE)
+    list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/vulkan/windows/.*")
+elseif(WIN32)
+    list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/vulkan/macos/.*")
+elseif(UNIX AND NOT APPLE)
+    list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/vulkan/windows/.*")
+    list(FILTER AGPRender_sources EXCLUDE REGEX ".*/src/vulkan/macos/.*")
+endif()
 add_library(AGPRender STATIC
   ${AGPRender_sources}
   ${CMAKE_CURRENT_SOURCE_DIR}/src/plugin/static_plugin.cpp
@@ -70,8 +91,16 @@ add_library(AGPRender::AGPRender ALIAS AGPRender)
 target_include_directories(AGPRender PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party
   ${CMAKE_CURRENT_SOURCE_DIR}/assets
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan/windows)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Platform-specific include directories
+if(APPLE)
+  target_include_directories(AGPRender PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan/macos)
+elseif(WIN32)
+  target_include_directories(AGPRender PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan/windows)
+elseif(UNIX AND NOT APPLE)
+  target_include_directories(AGPRender PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan/linux)
+endif()
 target_link_libraries(AGPRender PRIVATE Vulkan::Vulkan)
 target_link_libraries(AGPRender PRIVATE
   AGPBase::AGPBaseAPI
@@ -79,7 +108,11 @@ target_link_libraries(AGPRender PRIVATE
   AGPRenderAPI)
 target_compile_definitions(AGPRender PRIVATE RENDER_BUILDTYPE="$<CONFIG>")
 target_compile_definitions(AGPRender PUBLIC CORE_STATIC_PLUGIN_HEADER="${ENGINE_DIR}/src/static_plugin_decl.h")
-target_compile_definitions(AGPRender PRIVATE "RENDER_PUBLIC=__declspec(dllexport)")
+if(WIN32)
+    target_compile_definitions(AGPRender PRIVATE "RENDER_PUBLIC=__declspec(dllexport)")
+else()
+    target_compile_definitions(AGPRender PRIVATE "RENDER_PUBLIC=__attribute__((visibility(\"default\")))")
+endif()
 target_compile_definitions(AGPRender PUBLIC RENDER_HAS_VULKAN_BACKEND=1)
 target_compile_definitions(AGPRender PRIVATE
   VMA_STATS_STRING_ENABLED=0
@@ -87,7 +120,9 @@ target_compile_definitions(AGPRender PRIVATE
   USE_NEW_VMA=1)
 target_compile_definitions(AGPRender PUBLIC RENDER_HAS_GLES_BACKEND=0)
 target_compile_definitions(AGPRender PUBLIC RENDER_HAS_GL_BACKEND=0)
-target_compile_definitions(AGPRender PUBLIC NOMINMAX)
+if(WIN32)
+    target_compile_definitions(AGPRender PUBLIC NOMINMAX)
+endif()
 target_compile_definitions(AGPRender PUBLIC RENDER_DEV_ENABLED=0)
 target_compile_definitions(AGPRender PRIVATE RENDER_LOG_TO_CONSOLE=1)
 target_compile_definitions(AGPRender PRIVATE RENDER_LOG_TO_DEBUG_OUTPUT=1)
@@ -104,7 +139,11 @@ target_compile_definitions(AGPRender PRIVATE RENDER_GL_DEBUG=1)
 target_compile_definitions(AGPRender PUBLIC RENDER_GPU_TIMESTAMP_QUERIES_ENABLED=0)
 target_compile_definitions(AGPRender PUBLIC RENDER_VULKAN_FSR_ENABLED=0)
 target_compile_definitions(AGPRender PUBLIC RENDER_VULKAN_RT_ENABLED=0)
-target_compile_options(AGPRender PRIVATE /GR-)
+if(WIN32)
+    target_compile_options(AGPRender PRIVATE /GR-)
+else()
+    target_compile_options(AGPRender PRIVATE -fvisibility=hidden)
+endif()
 set(shader_compiler_executable "${CMAKE_BINARY_DIR}/LumeShaderCompiler.exe")
 set(argument_list)
 list(APPEND argument_list "--optimize")
@@ -135,4 +174,8 @@ target_link_libraries(PluginAGPRender PRIVATE
   AGPRender::AGPRender
   AGPRender::AGPRenderAPI)
 target_compile_definitions(PluginAGPRender PRIVATE CORE_PLUGIN=1)
-target_compile_options(PluginAGPRender PRIVATE /GR-)
+if(WIN32)
+    target_compile_options(PluginAGPRender PRIVATE /GR-)
+else()
+    target_compile_options(PluginAGPRender PRIVATE -fvisibility=hidden)
+endif()
