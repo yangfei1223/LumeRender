@@ -1,0 +1,82 @@
+#version 460 core
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+
+// 输入：Ground Truth和优化结果的渲染图像
+layout(set = 0, binding = 0) uniform texture2D uGroundTruth;
+layout(set = 0, binding = 1) uniform texture2D uOptimized;
+layout(set = 0, binding = 2) uniform texture2D uUVTape;
+layout(set = 0, binding = 3) uniform sampler uSampler;
+
+// 输出：梯度图像（对应低分辨率纹理）
+layout(set = 0, binding = 4, rgba32f) uniform image2D uGradientImage;
+
+// Push constant
+layout(push_constant, std430) uniform uPushConstant {
+    vec2 lrTexSize;      // 低分辨率纹理尺寸
+    vec2 screenSize;     // 屏幕尺寸
+    float downsampleRatio; // 下采样比例 (gtSize / lrSize)
+};
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// 双线性插值权重反向传播
+void AccumulateGradient(vec2 uv, vec4 d_loss, vec2 texSize) {
+    vec2 pixelPos = uv * texSize - 0.5;
+    vec2 pi = floor(pixelPos);
+    vec2 pf = fract(pixelPos);
+    
+    float w00 = (1.0 - pf.x) * (1.0 - pf.y);
+    float w10 = pf.x * (1.0 - pf.y);
+    float w01 = (1.0 - pf.x) * pf.y;
+    float w11 = pf.x * pf.y;
+    
+    ivec2 coords[4] = {
+        ivec2(pi.x, pi.y),
+        ivec2(pi.x + 1.0, pi.y),
+        ivec2(pi.x, pi.y + 1.0),
+        ivec2(pi.x + 1.0, pi.y + 1.0)
+    };
+    
+    float weights[4] = float[](w00, w10, w01, w11);
+    
+    // 累加梯度到4个相邻纹素（使用imageLoad/imageStore）
+    for (int i = 0; i < 4; i++) {
+        // 边界检查
+        if (coords[i].x < 0 || coords[i].x >= int(texSize.x) || 
+            coords[i].y < 0 || coords[i].y >= int(texSize.y)) {
+            continue;
+        }
+        
+        // 读取现有梯度并累加
+        vec4 existing = imageLoad(uGradientImage, coords[i]);
+        vec4 newGrad = existing + d_loss * weights[i];
+        imageStore(uGradientImage, coords[i], newGrad);
+    }
+}
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    
+    // 边界检查
+    if (pixelCoord.x >= int(screenSize.x) || pixelCoord.y >= int(screenSize.y)) {
+        return;
+    }
+    
+    // 读取Ground Truth和优化结果
+    vec4 gtColor = texelFetch(sampler2D(uGroundTruth, uSampler), pixelCoord, 0);
+    vec4 optColor = texelFetch(sampler2D(uOptimized, uSampler), pixelCoord, 0);
+    vec2 uv = texelFetch(sampler2D(uUVTape, uSampler), pixelCoord, 0).xy;
+    
+    // 检查有效性（负值表示背景）
+    if (uv.x < 0.0 || uv.y < 0.0) {
+        return;
+    }
+    
+    // MSE Loss: L = (opt - gt)^2
+    // dL/d(opt) = 2 * (opt - gt)
+    vec4 d_loss = 2.0 * (optColor - gtColor);
+    
+    // 反向传播到纹理
+    AccumulateGradient(uv, d_loss, lrTexSize);
+}
