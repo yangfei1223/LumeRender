@@ -285,11 +285,12 @@ void RenderNodeSRTraining::DispatchDifferentiableRender(IRenderCommandList& cmdL
     differentiableRenderBinder_->BindImage(1, normalBuffer_);
     differentiableRenderBinder_->BindImage(2, materialBuffer_);
     differentiableRenderBinder_->BindImage(3, uvBuffer_);
-    differentiableRenderBinder_->BindImage(4, lrTexture_);
-    differentiableRenderBinder_->BindSampler(5, sampler_);
-    differentiableRenderBinder_->BindImage(6, lrGradient_);
-    differentiableRenderBinder_->BindImage(7, lossOutput_);
-    differentiableRenderBinder_->BindImage(8, gtImage_);
+    differentiableRenderBinder_->BindImage(4, baseColorBuffer_);  // binding 4 for downsample init
+    differentiableRenderBinder_->BindImage(5, lrTexture_);
+    differentiableRenderBinder_->BindSampler(6, sampler_);
+    differentiableRenderBinder_->BindImage(7, lrGradient_);
+    differentiableRenderBinder_->BindImage(8, lossOutput_);
+    differentiableRenderBinder_->BindImage(9, gtImage_);
     
     cmdList.UpdateDescriptorSet(differentiableRenderBinder_->GetDescriptorSetHandle(),
                                  differentiableRenderBinder_->GetDescriptorSetLayoutBindingResources());
