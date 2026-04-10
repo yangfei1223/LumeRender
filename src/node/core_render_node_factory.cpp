@@ -32,6 +32,7 @@
 #include "node/render_node_shader_passes_generic.h"
 #include "node/render_node_single_post_process.h"
 #include "node/render_node_staging.h"
+#include "postprocesses/render_node_sr_training.h"
 #include "nodecontext/render_node_manager.h"
 
 using namespace CORE_NS;
@@ -60,5 +61,6 @@ void RegisterCoreRenderNodes(RenderNodeManager& renderNodeManager)
     renderNodeManager.AddRenderNodeFactory(FillRenderNodeType<RenderNodeDefaultAccelerationStructureStaging>());
     renderNodeManager.AddRenderNodeFactory(FillRenderNodeType<RenderNodeRenderPostProcessesGeneric>());
     renderNodeManager.AddRenderNodeFactory(FillRenderNodeType<RenderNodeQueueTransfer>());
+    renderNodeManager.AddRenderNodeFactory(FillRenderNodeType<RenderNodeSRTraining>());
 }
 RENDER_END_NAMESPACE()
